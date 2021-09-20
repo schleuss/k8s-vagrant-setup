@@ -18,13 +18,16 @@ MASTER_MEMORY=2048
 # Memoria para cada node
 NODE_MEMORY=1024
 
+# Network prefix
+NETWORK_PREFIX="192.168.165"
+
 Vagrant.configure("2") do |config|
 
 #   config.ssh.insert_key = false
       
     config.vm.define "k8s-master" do |master|
         master.vm.box = IMAGE_NAME
-        master.vm.network "private_network", ip: "192.168.50.10"
+        master.vm.network "private_network", ip: "#{NETWORK_PREFIX}.10"
         master.vm.hostname = "k8s-master"
         master.vm.provider :virtualbox do |vb|
             vb.name = "k8s-master"
@@ -35,7 +38,7 @@ Vagrant.configure("2") do |config|
         master.vm.provision "ansible" do |ansible|
             ansible.playbook = "kubernetes-setup/master-playbook.yml"
             ansible.extra_vars = {
-                node_ip: "192.168.50.10",
+                node_ip: "#{NETWORK_PREFIX}.10",
             }
         end
     end
@@ -43,7 +46,7 @@ Vagrant.configure("2") do |config|
     (1..NODES).each do |i|
         config.vm.define "k8s-node-#{i}" do |node|
             node.vm.box = IMAGE_NAME
-            node.vm.network "private_network", ip: "192.168.50.#{i + 10}"
+            node.vm.network "private_network", ip: "#{NETWORK_PREFIX}.#{i + 10}"
             node.vm.hostname = "node-#{i}"
             node.vm.provider :virtualbox do |vb|
                 vb.name = "k8s-node-#{i}"
@@ -54,7 +57,7 @@ Vagrant.configure("2") do |config|
             node.vm.provision "ansible" do |ansible|
                 ansible.playbook = "kubernetes-setup/node-playbook.yml"
                 ansible.extra_vars = {
-                    node_ip: "192.168.50.#{i + 10}",
+                    node_ip: "#{NETWORK_PREFIX}.#{i + 10}",
                 }
             end
         end
