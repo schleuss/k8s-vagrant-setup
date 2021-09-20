@@ -2,7 +2,7 @@
 # vi: set ft=ruby  :
 
 # #########################################################################################
-# Base on Kubernetes blog post example
+# Based on Kubernetes blog post 
 # https://kubernetes.io/blog/2019/03/15/kubernetes-setup-using-ansible-and-vagrant/
 # #########################################################################################
 
