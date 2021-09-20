@@ -45,3 +45,48 @@ Use suspend/resume to pause de execution
 vagrant suspend
 vagrant resume
 ```
+
+# Enable MetalLB
+
+Based on MetalLB [doc](https://metallb.universe.tf/installation/)
+
+Enable strictARP
+
+```
+kubectl get configmap kube-proxy -n kube-system -o yaml | \
+sed -e "s/strictARP: false/strictARP: true/" | \
+kubectl apply -f - -n kube-system
+```
+
+Install MetalLB
+
+``` 
+ kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.10.2/manifests/namespace.yaml
+ kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.10.2/manifests/metallb.yaml
+ ```
+
+ Configure MetalLB
+
+
+ 1) Create a YAML file (metallb-conf.yaml)
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    address-pools:
+    - name: default
+      protocol: layer2
+      addresses:
+      - 192.168.165.100-192.168.165.250
+```
+
+2) Apply the config file 
+
+```bash
+kubectl apply -f  metallb-conf.yaml
+```
