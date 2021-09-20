@@ -3,9 +3,8 @@
 ## Requirements
 
 
-
-1) (Vagrant)[https://www.vagrantup.com/docs/installation]
-2) Kubectl (https://kubernetes.io/docs/tasks/tools/)
+1) [Vagrant](https://www.vagrantup.com/docs/installation)
+2) [Kubectl](https://kubernetes.io/docs/tasks/tools/)
 
 
 ## Execute
