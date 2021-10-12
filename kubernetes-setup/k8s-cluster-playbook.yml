@@ -1,0 +1,2 @@
+- include: k8s-controlplane-playbook.yml
+- include: k8s-worker-playbook.yml

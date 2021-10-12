@@ -90,3 +90,34 @@ data:
 ```bash
 kubectl apply -f  metallb-conf.yaml
 ```
+
+
+# Remove all vagrant instances
+
+This command stops the running machine Vagrant is managing and destroys all resources that were created during the machine creation process. 
+
+```bash
+vagrant destroy
+```
+
+# Run Ansible on remote servers
+
+To run the ansible playbook on remote servers, first create a inventory file inside kubernetes-setup directory
+
+```
+[all:vars]
+ansible_user=root
+
+[controlplane]
+192.168.60.214 k8s_hostname=k8s-controlplane
+
+[workers]
+192.168.60.215 k8s_hostname=k8s-worker-01
+192.168.60.216 k8s_hostname=k8s-worker-02
+```
+
+Run ansible main playbook
+
+```bash
+ansible-playbook -i inventory k8s-cluster-playbook.yml
+```

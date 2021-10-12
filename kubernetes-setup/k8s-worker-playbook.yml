@@ -1,7 +1,15 @@
 ---
-- hosts: all
+- hosts: workers
   become: true
   tasks:
+    - name: Configure node_ip
+      set_fact:
+        node_ip: "{{ node_ip | default(ansible_default_ipv4.address) }}"
+
+    - name: Set server hostname 
+      ansible.builtin.hostname:
+        name: "{{ k8s_hostname }}"
+
     - name: Install packages that allow apt to be used over HTTPS
       apt:
         name: "{{ packages }}"
@@ -103,6 +111,7 @@
     - name: Configure node ip
       lineinfile:
         create: yes
+        mode: 0755
         path: /etc/default/kubelet
         line: KUBELET_EXTRA_ARGS=--node-ip={{ node_ip }}
 

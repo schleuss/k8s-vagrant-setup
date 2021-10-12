@@ -1,7 +1,22 @@
 ---
-- hosts: all
+- hosts: controlplane
   become: true
+
   tasks:
+    - name: Configure node_ip
+      set_fact:
+        node_ip: "{{ node_ip | default(ansible_default_ipv4.address) }}"
+
+    - name: Set server hostname 
+      ansible.builtin.hostname:
+        name: "{{ k8s_hostname }}"
+
+    - name: Add IP address to /etc/hosts
+      lineinfile: 
+        dest: /etc/hosts
+        line: '{{ node_ip }} {{ k8s_hostname }}'
+        state: present
+
     - name: Install packages that allow apt to be used over HTTPS
       apt:
         name: "{{ packages }}"
@@ -102,6 +117,7 @@
     - name: Configure node ip
       lineinfile:
         create: yes
+        mode: 0755
         path: /etc/default/kubelet
         line: KUBELET_EXTRA_ARGS=--node-ip={{ node_ip }}
 
@@ -112,12 +128,13 @@
         state: restarted
 
     - name: Initialize the Kubernetes cluster using kubeadm
-      command: kubeadm init --apiserver-advertise-address="{{ node_ip }}" --apiserver-cert-extra-sans="{{ node_ip }}"  --node-name k8s-master --pod-network-cidr=192.168.0.0/16
+      command: kubeadm init --apiserver-advertise-address="{{ node_ip }}" --apiserver-cert-extra-sans="{{ node_ip }}"  --node-name k8s-controlplane --pod-network-cidr=192.168.0.0/16
       args: 
          creates: /etc/kubernetes/manifests/kube-apiserver.yaml
 
     - name: Setup kubeconfig for vagrant user
       command: "{{ item }}"
+      changed_when: false 
       with_items:
       - mkdir -p /home/vagrant/.kube /root/.kube
       - cp /etc/kubernetes/admin.conf /home/vagrant/.kube/config
@@ -126,8 +143,12 @@
       - chown vagrant:vagrant /home/vagrant/.kube/config
 
     - name: Get k8s version string
-      shell: kubectl version | base64 | tr -d '\n' 
+      shell: set -o pipefail && kubectl version | base64 | tr -d '\n' 
+      changed_when: false
+      args:
+        executable: /usr/bin/bash
       register: k8sversion
+
     
     - name: Install wavenet pod network
       command: kubectl apply -f https://cloud.weave.works/k8s/v1.16/net.yaml?k8s-version="{{ k8sversion.stdout_lines[0] }}"
@@ -137,14 +158,15 @@
     - name: Generate join command
       command: kubeadm token create --print-join-command
       register: join_command
+      changed_when: false
 
     - name: Copy join command to local file
       become: false
-      local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="./join-command"
-
-    - name: Copy join command to local file
-      become: false
-      local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="./join-command"
+      delegate_to: 127.0.0.1
+      copy: 
+        content: "{{ join_command.stdout_lines[0] }}" 
+        dest: "./join-command"
+        mode: 0755
       
   handlers:
     - name: docker status
