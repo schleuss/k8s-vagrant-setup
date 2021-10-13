@@ -68,10 +68,11 @@
         daemon_reload: yes
         state: restarted
 
-    - name: Add vagrant user to docker group
+    - name: Add user to docker group
       user:
-        name: vagrant
-        group: docker
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
 
     - name: Remove swapfile from /etc/fstab
       mount:

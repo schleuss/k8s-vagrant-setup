@@ -53,10 +53,11 @@
       notify:
         - docker status
 
-    - name: Add vagrant user to docker group
+    - name: Add user to docker group
       user:
-        name: vagrant
-        group: docker
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
 
     - name: Criar diretorios do docker
       file:
@@ -132,15 +133,33 @@
       args: 
          creates: /etc/kubernetes/manifests/kube-apiserver.yaml
 
-    - name: Setup kubeconfig for vagrant user
+    - name: Get current user UID
+      command: "id -u {{ ansible_user }}"
+      changed_when: false
+      register: ansible_uid
+
+    - name: Get current user GID
+      command: "id -g {{ ansible_user }}"
+      changed_when: false
+      register: ansible_gid      
+
+    - name: Setup kubeconfig for user
       command: "{{ item }}"
       changed_when: false 
       with_items:
-      - mkdir -p /home/vagrant/.kube /root/.kube
-      - cp /etc/kubernetes/admin.conf /home/vagrant/.kube/config
+      - mkdir -p "/home/{{ ansible_user }}/.kube" /root/.kube
+      - cp /etc/kubernetes/admin.conf /home/"{{ ansible_user }}"/.kube/config
       - cp /etc/kubernetes/admin.conf /root/.kube/config
-      - cp /etc/kubernetes/admin.conf /vagrant/kubernetes_config.conf
-      - chown vagrant:vagrant /home/vagrant/.kube/config
+      - chown "{{ ansible_uid.stdout_lines[0]  }}:{{ ansible_gid.stdout_lines[0] }}" "/home/{{ ansible_user }}/.kube/config"
+
+    - name: Check vagrant directory
+      stat:
+        path: "/vagrant"
+      register: vagrant_directory
+
+    - name: Copy kubeconfig for vagrant
+      command: "cp /etc/kubernetes/admin.conf /vagrant/kubernetes_config.conf"
+      when: vagrant_directory.stat.exists   
 
     - name: Get k8s version string
       shell: set -o pipefail && kubectl version | base64 | tr -d '\n' 

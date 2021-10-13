@@ -1,3 +1,6 @@
 kubernetes_config.conf
 kubernetes-setup/join-command
+kubernetes-setup/inventory
 **/.vagrant/
+*.yml
+*.yaml
