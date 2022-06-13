@@ -38,7 +38,7 @@ Vagrant.configure("2") do |config|
             vb.customize ["modifyvm", :id, "--groups", "/#{VM_GROUP_NAME}"]
         end        
         controlplane.vm.provision "ansible" do |ansible|
-            ansible.playbook = "kubernetes-setup/k8s-controlplane-playbook.yml"
+            ansible.playbook = "kubernetes-setup/k8s-controlplane.yml"
             ansible.groups = {
                 "controlplane" => ["k8s-controlplane"]
             }
@@ -61,7 +61,7 @@ Vagrant.configure("2") do |config|
                 vb.customize ["modifyvm", :id, "--groups", "/#{VM_GROUP_NAME}"]
             end                  
             node.vm.provision "ansible" do |ansible|
-                ansible.playbook = "kubernetes-setup/k8s-worker-playbook.yml"
+                ansible.playbook = "kubernetes-setup/k8s-worker.yml"
                 ansible.groups = {
                     "workers" => ["k8s-worker-#{i}"]
                 }                

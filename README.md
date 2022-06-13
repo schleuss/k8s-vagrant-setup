@@ -27,10 +27,10 @@ To test:
 
 ```
 $ kubectl get nodes
-NAME         STATUS   ROLES                  AGE     VERSION
-k8s-master   Ready    control-plane,master   8m9s    v1.22.2
-node-1       Ready    <none>                 5m20s   v1.22.2
-node-2       Ready    <none>                 2m2s    v1.22.2
+NAME               STATUS   ROLES           AGE     VERSION
+k8s-controlplane   Ready    control-plane   80m     v1.24.1
+k8s-worker-1       Ready    <none>          9m31s   v1.24.1
+k8s-worker-2       Ready    <none>          3m56s   v1.24.1
 ```
 
 Delete the env
@@ -61,8 +61,8 @@ kubectl apply -f - -n kube-system
 Install MetalLB
 
 ``` 
- kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.10.2/manifests/namespace.yaml
- kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.10.2/manifests/metallb.yaml
+ kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.12.1/manifests/namespace.yaml
+ kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.12.1/manifests/metallb.yaml
  ```
 
  Configure MetalLB
@@ -109,15 +109,15 @@ To run the ansible playbook on remote servers, first create a inventory file ins
 ansible_user=root
 
 [controlplane]
-192.168.60.214 k8s_hostname=k8s-controlplane
+192.168.165.10 k8s_hostname=k8s-controlplane
 
 [workers]
-192.168.60.215 k8s_hostname=k8s-worker-01
-192.168.60.216 k8s_hostname=k8s-worker-02
+192.168.165.11 k8s_hostname=k8s-worker-01
+192.168.165.12 k8s_hostname=k8s-worker-02
 ```
 
 Run ansible main playbook
 
 ```bash
-ansible-playbook -i inventory k8s-cluster-playbook.yml
+ansible-playbook -i inventory k8s-cluster.yml
 ```

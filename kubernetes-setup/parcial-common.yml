@@ -1,6 +1,8 @@
 ---
-- hosts: workers
-  become: true
+- become: true
+  hosts: 
+    - controlplane
+    - workers
   tasks:
     - name: Configure node_ip
       set_fact:
@@ -20,6 +22,8 @@
         - apt-transport-https
         - ca-certificates
         - curl
+        - jq
+        - net-tools
         - gnupg-agent
         - software-properties-common
 
@@ -32,6 +36,7 @@
       apt_repository:
         repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
         state: present
+        filename: docker
 
     - name: Install docker and its dependecies
       apt: 
@@ -45,7 +50,6 @@
         - containerd.io
       notify:
         - docker status
-
 
     - name: Criar diretorios do docker
       file:
@@ -87,16 +91,45 @@
       command: swapoff -a
       when: ansible_swaptotal_mb > 0
 
+    - name: Check if cri-dockerd is installed
+      command: dpkg-query -W cri-dockerd
+      register: cri_dockerd_check_deb
+      failed_when: cri_dockerd_check_deb.rc > 1
+      changed_when: cri_dockerd_check_deb.rc == 1
+
+    - name: Get the latest version of cri-dockerd
+      shell: curl -s https://api.github.com/repos/Mirantis/cri-dockerd/releases/latest | jq -r '.assets[] | select(.content_type == "application/vnd.debian.binary-package") | {browser_download_url} | .browser_download_url' | grep focal
+      register: cri_latest_url
+      ignore_errors: True
+      when: cri_dockerd_check_deb.rc == 1
+
+    - name: Download cri-dockerd package
+      get_url: 
+        url="{{cri_latest_url.stdout}}"
+        dest="/tmp/cri-dockerd.deb"
+      when: cri_dockerd_check_deb.rc == 1
+
+    - name: Install cri-dockerd
+      apt: 
+        deb="/tmp/cri-dockerd.deb"
+      when: cri_dockerd_check_deb.rc == 1
+
+    - name: Restart cri-dockerd
+      service:
+        name: cri-docker
+        daemon_reload: yes
+        state: restarted
+
     - name: Add an apt signing key for Kubernetes
-      apt_key:
-        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-        state: present
+      get_url: 
+        url="https://packages.cloud.google.com/apt/doc/apt-key.gpg"
+        dest="/usr/share/keyrings/kubernetes-archive-keyring.gpg"
 
     - name: Adding apt repository for Kubernetes
       apt_repository:
-        repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+        repo: deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main
         state: present
-        filename: kubernetes.list
+        filename: kubernetes
 
     - name: Install Kubernetes binaries
       apt: 
@@ -121,14 +154,6 @@
         name: kubelet
         daemon_reload: yes
         state: restarted
-
-    - name: Copy the join command to server location
-      copy: src=join-command dest=/tmp/join-command.sh mode=0777
-
-    - name: Join the node to cluster
-      command: sh /tmp/join-command.sh
-      args: 
-         creates: /etc/kubernetes/kubelet.conf
 
   handlers:
     - name: docker status

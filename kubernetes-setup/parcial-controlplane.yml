@@ -1,0 +1,72 @@
+---
+- hosts: controlplane
+  become: true
+
+  tasks:
+    - name: Add IP address to /etc/hosts
+      lineinfile: 
+        dest: /etc/hosts
+        line: '{{ node_ip }} {{ k8s_hostname }}'
+        state: present
+
+    - name: Initialize the Kubernetes cluster using kubeadm
+      command: kubeadm init --apiserver-advertise-address="{{ node_ip }}" --apiserver-cert-extra-sans="{{ node_ip }}"  --node-name k8s-controlplane --pod-network-cidr=192.168.0.0/16 --cri-socket unix:///var/run/cri-dockerd.sock
+      args: 
+         creates: /etc/kubernetes/manifests/kube-apiserver.yaml
+
+    - name: Get current user UID
+      command: "id -u {{ ansible_user }}"
+      changed_when: false
+      register: ansible_uid
+
+    - name: Get current user GID
+      command: "id -g {{ ansible_user }}"
+      changed_when: false
+      register: ansible_gid
+
+    - name: Setup kubeconfig for user
+      command: "{{ item }}"
+      changed_when: false 
+      with_items:
+      - mkdir -p "/home/{{ ansible_user }}/.kube" /root/.kube
+      - cp /etc/kubernetes/admin.conf /home/"{{ ansible_user }}"/.kube/config
+      - cp /etc/kubernetes/admin.conf /root/.kube/config
+      - chown "{{ ansible_uid.stdout_lines[0]  }}:{{ ansible_gid.stdout_lines[0] }}" "/home/{{ ansible_user }}/.kube/config"
+
+    - name: Check vagrant directory
+      stat:
+        path: "/vagrant"
+      register: vagrant_directory
+
+    - name: Copy kubeconfig for vagrant
+      command: "cp /etc/kubernetes/admin.conf /vagrant/kubernetes_config.conf"
+      when: vagrant_directory.stat.exists   
+
+    - name: Get k8s version string
+      shell: set -o pipefail && kubectl version | base64 | tr -d '\n' 
+      changed_when: false
+      args:
+        executable: /usr/bin/bash
+      register: k8sversion
+    
+    - name: Install wavenet pod network
+      command: kubectl apply -f https://cloud.weave.works/k8s/net?k8s-version="{{ k8sversion.stdout_lines[0] }}"
+      args: 
+         creates: /opt/cni/bin/weave-net
+
+    - name: Generate join command
+      command: kubeadm token create --print-join-command
+      register: join_command
+      changed_when: false
+
+    - name: Copy join command to local file
+      become: false
+      delegate_to: 127.0.0.1
+      copy: 
+        content: "{{ join_command.stdout_lines[0] }} --cri-socket unix:///var/run/cri-dockerd.sock" 
+        dest: "./join-command"
+        mode: 0755
+      
+  handlers:
+    - name: docker status
+      service: name=docker state=started
