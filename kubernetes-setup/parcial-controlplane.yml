@@ -3,12 +3,6 @@
   become: true
 
   tasks:
-    - name: Add IP address to /etc/hosts
-      lineinfile: 
-        dest: /etc/hosts
-        line: '{{ node_ip }} {{ k8s_hostname }}'
-        state: present
-
     - name: Initialize the Kubernetes cluster using kubeadm
       command: kubeadm init --apiserver-advertise-address="{{ node_ip }}" --apiserver-cert-extra-sans="{{ node_ip }}"  --node-name k8s-controlplane --pod-network-cidr=192.168.0.0/16 --cri-socket unix:///var/run/cri-dockerd.sock
       args: 

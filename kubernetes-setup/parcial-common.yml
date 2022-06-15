@@ -1,16 +1,32 @@
 ---
 - become: true
-  hosts: 
-    - controlplane
-    - workers
+  hosts: all
   tasks:
     - name: Configure node_ip
       set_fact:
         node_ip: "{{ node_ip | default(ansible_default_ipv4.address) }}"
 
+    - debug: var=node_ip
+
     - name: Set server hostname 
       ansible.builtin.hostname:
         name: "{{ k8s_hostname }}"
+
+    - name: Check ip address on hosts file
+      lineinfile:
+        state: absent
+        path: "/etc/hosts"
+        regexp: "{{ k8s_hostname }}"
+      check_mode: true
+      changed_when: false # This just makes things look prettier in the logs
+      register: check
+
+    - name: Add IP address to /etc/hosts
+      lineinfile: 
+        dest: /etc/hosts
+        line: '{{ node_ip }} {{ k8s_hostname }}'
+        state: present
+      when: check.found == 0
 
     - name: Install packages that allow apt to be used over HTTPS
       apt:
@@ -142,12 +158,23 @@
           - kubeadm 
           - kubectl
 
+
+    - name: Check node conf for kubelet
+      lineinfile:
+        state: absent
+        path: "/etc/default/kubelet"
+        regexp: "--node-ip"
+      check_mode: true
+      changed_when: false
+      register: check_kubelet_conf
+      
     - name: Configure node ip
       lineinfile:
         create: yes
         mode: 0755
         path: /etc/default/kubelet
         line: KUBELET_EXTRA_ARGS=--node-ip={{ node_ip }}
+      when: check_kubelet_conf.found == 0
 
     - name: Restart kubelet
       service:
