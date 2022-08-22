@@ -121,3 +121,49 @@ Run ansible main playbook
 ```bash
 ansible-playbook -i inventory k8s-cluster.yml
 ```
+
+
+
+# Enable K8S Metrics Server
+
+```bash
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+```
+
+Caso o metrics-server não funcione corretamente, realizar a seguinte alteração na configuração
+
+```bash
+kubectl patch deployments -n kube-system metrics-server \
+   -p '{"spec": {"template": {"spec": {"hostNetwork": true, "dnsPolicy": "ClusterFirst"}}}}'
+```
+
+> Fonte: https://www.devopszones.com/2022/06/kubernetes-error-from-server.html
+
+
+Outro erro que pode antecer:
+
+```
+kubectl logs -n kube-system metrics-server-678f4bf65b-5tr6d
+
+E0821 20:07:10.589693       1 scraper.go:140] "Failed to scrape node" err="Get \"https://192.168.165.12:10250/metrics/resource\": x509: cannot validate certificate for 192.168.165.12 because it doesn't contain any IP SANs" node="k8s-worker-2"
+
+```
+
+Neste caso, é necessário editar o deployment e incluir no comando a opção --kubelet-insecure-tls
+
+```yaml
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        k8s-app: metrics-server
+    spec:
+      containers:
+      - args:
+        - --cert-dir=/tmp
+        - --secure-port=4443
+        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+        - --kubelet-use-node-status-port
+        - --metric-resolution=15s
+        - --kubelet-insecure-tls
+```

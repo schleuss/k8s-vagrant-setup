@@ -42,6 +42,7 @@
         - net-tools
         - gnupg-agent
         - software-properties-common
+        - nfs-common
 
     - name: Add an apt signing key for Docker
       apt_key:
