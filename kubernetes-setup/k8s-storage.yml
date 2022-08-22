@@ -1,0 +1,90 @@
+---
+- become: true
+  hosts: all
+  vars:
+    - nfs_exports: [ "/app/storage   *(rw,sync,no_root_squash,no_all_squash,no_subtree_check,fsid=25)" ]
+  tasks:
+    - name: Configure node_ip
+      set_fact:
+        node_ip: "{{ node_ip | default(ansible_default_ipv4.address) }}"
+
+    - debug: var=node_ip
+
+    - name: Set server hostname 
+      ansible.builtin.hostname:
+        name: "{{ k8s_hostname }}"
+
+    - name: Check ip address on hosts file
+      lineinfile:
+        state: absent
+        path: "/etc/hosts"
+        regexp: "{{ k8s_hostname }}"
+      check_mode: true
+      changed_when: false # This just makes things look prettier in the logs
+      register: check
+
+    - name: Add IP address to /etc/hosts
+      lineinfile: 
+        dest: /etc/hosts
+        line: '{{ node_ip }} {{ k8s_hostname }}'
+        state: present
+      when: check.found == 0
+
+    - name: Install packages that allow apt to be used over HTTPS
+      apt:
+        name: "{{ packages }}"
+        state: present
+        update_cache: yes
+      vars:
+        packages:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - jq
+        - net-tools
+        - gnupg-agent
+        - software-properties-common
+
+    - name: Remove swapfile from /etc/fstab
+      mount:
+        name: "{{ item }}"
+        fstype: swap
+        state: absent
+      with_items:
+        - swap
+        - none
+
+    - name: Disable swap
+      command: swapoff -a
+      when: ansible_swaptotal_mb > 0
+
+    - name: Ensure NFS utilities are installed.
+      apt:
+        name:
+          - nfs-common
+          - nfs-kernel-server
+        state: present
+
+
+    - name: Ensure directories to export exist
+      file:  # noqa 208
+        path: "{{ item.strip().split()[0] }}"
+        state: directory
+      with_items: "{{ nfs_exports }}"
+      
+    - name: Copy exports file.
+      template:
+        src: exports.j2
+        dest: /etc/exports
+        owner: root
+        group: root
+        mode: 0644
+      notify: reload nfs
+
+    - name: Ensure nfs is running.
+      service: "name=nfs-kernel-server state=started enabled=yes"
+      when: nfs_exports|length
+
+  handlers:
+    - name: reload nfs
+      command: 'exportfs -ra'      
