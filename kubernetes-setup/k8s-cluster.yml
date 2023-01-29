@@ -1,4 +1,6 @@
 - import_playbook: parcial-common.yml
+- import_playbook: parcial-docker.yml
 - import_playbook: parcial-controlplane.yml
 - import_playbook: parcial-worker.yml
+- import_playbook: parcial-storage.yml
 - import_playbook: parcial-metrics.yml

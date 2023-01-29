@@ -3,6 +3,12 @@
   become: true
 
   tasks:
+    - name: Configure node_ip
+      set_fact:
+        node_ip: "{{ node_ip | default(ansible_default_ipv4.address) }}"
+
+    - debug: var=node_ip
+
     - name: Initialize the Kubernetes cluster using kubeadm
       command: kubeadm init --apiserver-advertise-address="{{ node_ip }}" --apiserver-cert-extra-sans="{{ node_ip }}"  --node-name k8s-controlplane --pod-network-cidr=192.168.0.0/16 --cri-socket unix:///var/run/cri-dockerd.sock
       args: 
@@ -22,29 +28,25 @@
       command: "{{ item }}"
       changed_when: false 
       with_items:
-      - mkdir -p "/home/{{ ansible_user }}/.kube" /root/.kube
-      - cp /etc/kubernetes/admin.conf /home/"{{ ansible_user }}"/.kube/config
+      - mkdir -p "/home/{{ ansible_user }}/.kube" "/root/.kube"
+      - cp /etc/kubernetes/admin.conf /home/{{ ansible_user }}/.kube/config
       - cp /etc/kubernetes/admin.conf /root/.kube/config
+      - cp  /etc/kubernetes/admin.conf /tmp/kubernetes_config.conf
       - chown "{{ ansible_uid.stdout_lines[0]  }}:{{ ansible_gid.stdout_lines[0] }}" "/home/{{ ansible_user }}/.kube/config"
 
-    - name: Check vagrant directory
-      stat:
-        path: "/vagrant"
-      register: vagrant_directory
+    - name: Copy kubeconfig to localhost
+      fetch:
+        src: /tmp/kubernetes_config.conf
+        dest: ../
+        flat: yes
 
-    - name: Copy kubeconfig for vagrant
-      command: "cp /etc/kubernetes/admin.conf /vagrant/kubernetes_config.conf"
-      when: vagrant_directory.stat.exists   
+    - name: Get the latest version of wavenet
+      shell: curl -s https://api.github.com/repos/weaveworks/weave/releases/latest | jq -r '.tag_name' | head -n1
+      register: wavenet_latest_url
+      ignore_errors: True
 
-    - name: Get k8s version string
-      shell: set -o pipefail && kubectl version | base64 | tr -d '\n' 
-      changed_when: false
-      args:
-        executable: /usr/bin/bash
-      register: k8sversion
-    
     - name: Install wavenet pod network
-      command: kubectl apply -f https://cloud.weave.works/k8s/net?k8s-version="{{ k8sversion.stdout_lines[0] }}"
+      command: kubectl apply -f https://github.com/weaveworks/weave/releases/download/{{wavenet_latest_url.stdout}}/weave-daemonset-k8s.yaml
       args: 
          creates: /opt/cni/bin/weave-net
 
@@ -53,14 +55,15 @@
       register: join_command
       changed_when: false
 
-    - name: Copy join command to local file
+    - name: Copy join command to worker nodes
       become: false
-      delegate_to: 127.0.0.1
+      delegate_to: "{{ item }}"
       copy: 
         content: "{{ join_command.stdout_lines[0] }} --cri-socket unix:///var/run/cri-dockerd.sock" 
-        dest: "./join-command"
+        dest: "/tmp/join-command"
         mode: 0755
-      
+      with_items: "{{groups['workers']}}"
+
   handlers:
     - name: docker status
       service: name=docker state=started

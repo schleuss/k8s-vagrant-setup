@@ -11,4 +11,3 @@
     - name: Install metrics server
       command: kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
       when: check_metrics_server.rc == 1
-

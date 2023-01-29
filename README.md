@@ -28,9 +28,9 @@ To test:
 ```
 $ kubectl get nodes
 NAME               STATUS   ROLES           AGE     VERSION
-k8s-controlplane   Ready    control-plane   80m     v1.24.1
-k8s-worker-1       Ready    <none>          9m31s   v1.24.1
-k8s-worker-2       Ready    <none>          3m56s   v1.24.1
+k8s-controlplane   Ready    control-plane   80m     v1.26.1
+k8s-worker-1       Ready    <none>          9m31s   v1.26.1
+k8s-worker-2       Ready    <none>          3m56s   v1.26.1
 ```
 
 Delete the env
@@ -61,8 +61,7 @@ kubectl apply -f - -n kube-system
 Install MetalLB
 
 ``` 
- kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.12.1/manifests/namespace.yaml
- kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.12.1/manifests/metallb.yaml
+ kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.7/config/manifests/metallb-native.yaml
  ```
 
  Configure MetalLB
@@ -82,7 +81,7 @@ data:
     - name: default
       protocol: layer2
       addresses:
-      - 192.168.165.100-192.168.165.250
+      - 192.168.122.100-192.168.122.250
 ```
 
 2) Apply the config file 
@@ -109,11 +108,14 @@ To run the ansible playbook on remote servers, first create a inventory file ins
 ansible_user=root
 
 [controlplane]
-192.168.165.10 k8s_hostname=k8s-controlplane
+192.168.165.10
 
 [workers]
-192.168.165.11 k8s_hostname=k8s-worker-01
-192.168.165.12 k8s_hostname=k8s-worker-02
+192.168.165.11
+192.168.165.12
+
+[storage]
+192.168.165.15
 ```
 
 Run ansible main playbook
@@ -122,15 +124,13 @@ Run ansible main playbook
 ansible-playbook -i inventory k8s-cluster.yml
 ```
 
-
-
 # Enable K8S Metrics Server
 
 ```bash
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 ```
 
-Caso o metrics-server não funcione corretamente, realizar a seguinte alteração na configuração
+If the metrics server doesn't work correctly, perform the following configuration changes
 
 ```bash
 kubectl patch deployments -n kube-system metrics-server \
@@ -140,7 +140,7 @@ kubectl patch deployments -n kube-system metrics-server \
 > Fonte: https://www.devopszones.com/2022/06/kubernetes-error-from-server.html
 
 
-Outro erro que pode antecer:
+Another error that can happen:
 
 ```
 kubectl logs -n kube-system metrics-server-678f4bf65b-5tr6d
@@ -149,7 +149,7 @@ E0821 20:07:10.589693       1 scraper.go:140] "Failed to scrape node" err="Get \
 
 ```
 
-Neste caso, é necessário editar o deployment e incluir no comando a opção --kubelet-insecure-tls
+In this case, it's necessary to edit the deployment and include the --kubelet-insecure-tls option in the command.
 
 ```yaml
   template:
