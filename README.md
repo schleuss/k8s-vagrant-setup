@@ -61,7 +61,7 @@ kubectl apply -f - -n kube-system
 Install MetalLB
 
 ``` 
- kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.7/config/manifests/metallb-native.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.9/config/manifests/metallb-native.yaml
  ```
 
  Configure MetalLB
@@ -70,26 +70,28 @@ Install MetalLB
  1) Create a YAML file (metallb-conf.yaml)
 
 ```yaml
-apiVersion: v1
-kind: ConfigMap
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
 metadata:
+  name: metallb-addr-pool
   namespace: metallb-system
-  name: config
-data:
-  config: |
-    address-pools:
-    - name: default
-      protocol: layer2
-      addresses:
-      - 192.168.122.100-192.168.122.250
+spec:
+  addresses:
+  - 192.168.121.100-192.168.121.199
+
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: metallb-l2advertisement
+  namespace: metallb-system
 ```
 
 2) Apply the config file 
 
 ```bash
-kubectl apply -f  metallb-conf.yaml
+kubectl apply -f metallb-conf.yaml
 ```
-
 
 # Remove all vagrant instances
 
@@ -132,38 +134,15 @@ kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/late
 
 If the metrics server doesn't work correctly, perform the following configuration changes
 
-```bash
-kubectl patch deployments -n kube-system metrics-server \
-   -p '{"spec": {"template": {"spec": {"hostNetwork": true, "dnsPolicy": "ClusterFirst"}}}}'
-```
-
 > Fonte: https://www.devopszones.com/2022/06/kubernetes-error-from-server.html
 
+```bash
+kubectl patch deployments -n kube-system metrics-server \
+   --type=json -p '{"spec": {"template": {"spec": {"hostNetwork": true, "dnsPolicy": "ClusterFirst"}}}}'
 
-Another error that can happen:
-
+# Only when using invalid certificates.. (x509: cannot validate certificate)
+kubectl patch deployments.apps -n kube-system metrics-server \
+   --type=json -p '[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls" }]'
 ```
-kubectl logs -n kube-system metrics-server-678f4bf65b-5tr6d
 
-E0821 20:07:10.589693       1 scraper.go:140] "Failed to scrape node" err="Get \"https://192.168.165.12:10250/metrics/resource\": x509: cannot validate certificate for 192.168.165.12 because it doesn't contain any IP SANs" node="k8s-worker-2"
 
-```
-
-In this case, it's necessary to edit the deployment and include the --kubelet-insecure-tls option in the command.
-
-```yaml
-  template:
-    metadata:
-      creationTimestamp: null
-      labels:
-        k8s-app: metrics-server
-    spec:
-      containers:
-      - args:
-        - --cert-dir=/tmp
-        - --secure-port=4443
-        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
-        - --kubelet-use-node-status-port
-        - --metric-resolution=15s
-        - --kubelet-insecure-tls
-```

@@ -54,7 +54,7 @@ Vagrant.configure("2") do |config|
         controlplane.vm.provider :libvirt do |vb|
             vb.memory = CONTROLPLANE_MEMORY
             vb.cpus = 2
-        end        
+        end
 
         controlplane.vm.provision :ansible do |ansible|
             ansible.playbook           = "kubernetes-setup/k8s-cluster.yml"
@@ -62,6 +62,9 @@ Vagrant.configure("2") do |config|
             ansible.compatibility_mode = '2.0'
             ansible.limit              = 'all'
             ansible.inventory_path     = "inventory.py"
+            ansible.extra_vars = {
+                kubernetes_version: "=1.25.8-00"
+            }
         end
     end
 end
